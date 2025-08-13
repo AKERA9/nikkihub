@@ -7,6 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -38,6 +40,27 @@
             background-color: #FEA7A7;
             border-bottom-left-radius: 50% 20%;
             border-bottom-right-radius: 50% 20%;
+        }
+        .filter-btn-active {
+            background-color: #2563eb !important;
+            color: white !important;
+        }
+        #map-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        #map {
+            height: 80%;
+            width: 90%;
+            max-width: 400px;
+            margin: 10% auto;
         }
         @media print {
             body * {
@@ -71,13 +94,17 @@
                     <i class="fa-solid fa-battery-full text-gray-700"></i>
                 </div>
             </div>
-            <div class="flex items-center text-sm text-gray-600 mb-4">
+            <button onclick="openMapModal()" class="flex items-center text-sm text-gray-600 mb-2 w-full text-left">
                 <i class="fa-solid fa-location-dot mr-2 text-gray-500"></i>
-                <span>Downtown Dubai</span>
+                <span id="location-text">Detecting Location...</span>
                 <i class="fa-solid fa-chevron-down ml-1 text-xs"></i>
+            </button>
+             <div class="text-sm font-bold text-green-600 mb-4">
+                <i class="fa-solid fa-tag mr-2"></i>
+                <span>You have 25% off for your order</span>
             </div>
             <div class="relative">
-                <input type="text" placeholder="What are you looking for?" class="w-full bg-gray-100 border border-gray-200 rounded-lg py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="text" id="search-input" oninput="handleSearch()" placeholder="What are you looking for?" class="w-full bg-gray-100 border border-gray-200 rounded-lg py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
             </div>
              <div class="flex items-center justify-between mt-3 text-xs text-gray-500">
@@ -95,10 +122,10 @@
             <!-- All pages are managed here -->
             <div id="home" class="page-content active p-4"></div>
             <div id="categories" class="page-content p-4"></div>
-            <div id="my-item" class="page-content p-4"><h2 class="text-2xl font-bold text-center mt-10">My Items Page</h2><p class="text-center text-gray-500">Yahan aapke items dikhenge.</p></div>
             <div id="cart" class="page-content p-4"></div>
             <div id="profile" class="page-content"></div>
             <div id="all-products-page" class="page-content p-4"></div>
+            <div id="search-page" class="page-content p-4"></div>
             <div id="category-page" class="page-content p-4"></div>
             <div id="offer-page" class="page-content p-4"></div>
             <div id="checkout-page" class="page-content p-4"></div>
@@ -114,10 +141,18 @@
         <nav id="bottom-nav" class="fixed bottom-0 left-0 right-0 max-w-sm mx-auto bg-white border-t border-gray-200 flex justify-around z-30 no-print">
             <button onclick="showTab('home')" class="tab-button tab-active flex flex-col items-center justify-center text-center text-gray-500 p-3 w-full"><i class="fa-solid fa-house text-xl"></i><span class="text-xs font-medium mt-1">Home</span></button>
             <button onclick="showTab('categories')" class="tab-button flex flex-col items-center justify-center text-center text-gray-500 p-3 w-full"><i class="fa-solid fa-layer-group text-xl"></i><span class="text-xs font-medium mt-1">Categories</span></button>
-            <button onclick="showTab('my-item')" class="tab-button flex flex-col items-center justify-center text-center text-gray-500 p-3 w-full"><i class="fa-solid fa-box text-xl"></i><span class="text-xs font-medium mt-1">My Item</span></button>
+            <button onclick="showTab('allProducts')" class="tab-button flex flex-col items-center justify-center text-center text-gray-500 p-3 w-full"><i class="fa-solid fa-store text-xl"></i><span class="text-xs font-medium mt-1">All Products</span></button>
             <button onclick="showTab('cart')" class="tab-button relative flex flex-col items-center justify-center text-center text-gray-500 p-3 w-full"><i class="fa-solid fa-cart-shopping text-xl"></i><span class="text-xs font-medium mt-1">Cart</span><span id="cart-badge" class="absolute top-1 right-5 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center hidden">0</span></button>
             <button onclick="showTab('profile')" class="tab-button flex flex-col items-center justify-center text-center text-gray-500 p-3 w-full"><i class="fa-solid fa-user text-xl"></i><span class="text-xs font-medium mt-1">Profile</span></button>
         </nav>
+    </div>
+
+    <div id="map-modal">
+        <div class="bg-white p-2 rounded-lg relative" style="width: 90%; max-width: 400px; margin: 5% auto;">
+            <button onclick="closeMapModal()" class="absolute top-2 right-2 z-10 bg-white rounded-full h-8 w-8 flex items-center justify-center shadow-md">&times;</button>
+            <div id="map" style="height: 400px; width: 100%;"></div>
+            <p id="map-message" class="text-center text-red-500 font-bold p-2"></p>
+        </div>
     </div>
 
     <script>
@@ -126,13 +161,21 @@
         let currentUser = null;
         let cart = [];
         let deliveryAddress = {};
+        let selectedAddress = null; // To store address from map
         let tempMobile = '';
         let checkoutRedirect = false;
+        let currentSortOrder = 'default';
+        let currentSearchSortOrder = 'default';
+        let map;
+        let marker;
+        const BASE_LOCATION = [28.3800, 77.3100]; // Approx coords for Sector 23, Faridabad
+        const DELIVERY_RADIUS_KM = 5;
 
         // --- DOM ELEMENTS ---
         const mainHeader = document.getElementById('main-header');
         const bottomNav = document.getElementById('bottom-nav');
         const cartBadge = document.getElementById('cart-badge');
+        const mapModal = document.getElementById('map-modal');
         
         // Page Containers
         const pageContainers = {
@@ -141,6 +184,7 @@
             cart: document.getElementById('cart'),
             profile: document.getElementById('profile'),
             allProducts: document.getElementById('all-products-page'),
+            search: document.getElementById('search-page'),
             category: document.getElementById('category-page'),
             offer: document.getElementById('offer-page'),
             checkout: document.getElementById('checkout-page'),
@@ -259,7 +303,7 @@
         function renderAllProductsPreview() {
             const grid = document.getElementById('all-products-preview-grid');
             grid.innerHTML = allProductsData.slice(6, 17).map(createProductCard).join('');
-            grid.innerHTML += `<button onclick="showPage('allProducts')" class="border rounded-t-lg p-2 flex flex-col justify-center items-center shadow-sm bg-gray-50 hover:bg-gray-100"><i class="fa-solid fa-arrow-right text-3xl text-blue-600"></i><span class="text-sm font-bold text-blue-600 mt-2">View More</span></button>`;
+            grid.innerHTML += `<button onclick="showTab('allProducts')" class="border rounded-t-lg p-2 flex flex-col justify-center items-center shadow-sm bg-gray-50 hover:bg-gray-100"><i class="fa-solid fa-arrow-right text-3xl text-blue-600"></i><span class="text-sm font-bold text-blue-600 mt-2">View More</span></button>`;
         }
 
         function renderSeasonalOffers() {
@@ -271,8 +315,49 @@
         }
         
         function renderAllProductsPage() {
-            const productsHtml = allProductsData.map(createProductCard).join('');
-            pageContainers.allProducts.innerHTML = `<div class="flex items-center mb-4"><button onclick="showTab('home')" class="text-xl text-gray-700 mr-4"><i class="fa-solid fa-arrow-left"></i></button><h2 class="text-xl font-bold text-gray-800">All Products</h2></div><div class="grid grid-cols-2 gap-4">${productsHtml}</div>`;
+            let sortedProducts = [...allProductsData];
+            if (currentSortOrder === 'lowToHigh') {
+                sortedProducts.sort((a, b) => a.price - b.price);
+            } else if (currentSortOrder === 'highToLow') {
+                sortedProducts.sort((a, b) => b.price - a.price);
+            }
+            
+            const productsHtml = sortedProducts.map(createProductCard).join('');
+            pageContainers.allProducts.innerHTML = `
+                <div class="flex items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">All Products</h2>
+                </div>
+                <div class="flex justify-center space-x-2 mb-4">
+                    <button onclick="sortProducts('lowToHigh')" class="px-4 py-2 text-sm rounded-full border ${currentSortOrder === 'lowToHigh' ? 'filter-btn-active' : 'bg-gray-200'}">Low to High</button>
+                    <button onclick="sortProducts('highToLow')" class="px-4 py-2 text-sm rounded-full border ${currentSortOrder === 'highToLow' ? 'filter-btn-active' : 'bg-gray-200'}">High to Low</button>
+                    <button onclick="sortProducts('default')" class="px-4 py-2 text-sm rounded-full border ${currentSortOrder === 'default' ? 'filter-btn-active' : 'bg-gray-200'}">All</button>
+                </div>
+                <div class="grid grid-cols-2 gap-4">${productsHtml}</div>`;
+        }
+        
+        function renderSearchPage(searchTerm) {
+            let filteredProducts = allProductsData.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+            
+            if (currentSearchSortOrder === 'lowToHigh') {
+                filteredProducts.sort((a, b) => a.price - b.price);
+            } else if (currentSearchSortOrder === 'highToLow') {
+                filteredProducts.sort((a, b) => b.price - a.price);
+            }
+
+            const productsHtml = filteredProducts.length > 0 
+                ? filteredProducts.map(createProductCard).join('')
+                : `<p class="col-span-2 text-center text-gray-500">No products found for "${searchTerm}"</p>`;
+
+            pageContainers.search.innerHTML = `
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">Search Founded for: <span class="font-extrabold">'${searchTerm}'</span></h2>
+                </div>
+                <div class="flex justify-center space-x-2 mb-4">
+                    <button onclick="sortSearchResults('lowToHigh')" class="px-4 py-2 text-sm rounded-full border ${currentSearchSortOrder === 'lowToHigh' ? 'filter-btn-active' : 'bg-gray-200'}">Low to High</button>
+                    <button onclick="sortSearchResults('highToLow')" class="px-4 py-2 text-sm rounded-full border ${currentSearchSortOrder === 'highToLow' ? 'filter-btn-active' : 'bg-gray-200'}">High to Low</button>
+                    <button onclick="sortSearchResults('default')" class="px-4 py-2 text-sm rounded-full border ${currentSearchSortOrder === 'default' ? 'filter-btn-active' : 'bg-gray-200'}">All</button>
+                </div>
+                <div class="grid grid-cols-2 gap-4">${productsHtml}</div>`;
         }
 
         function renderCategoryPage(categoryName) {
@@ -306,7 +391,7 @@
         }
 
         function renderCheckoutPage() {
-            pageContainers.checkout.innerHTML = `<div class="flex items-center mb-4"><button onclick="showTab('cart')" class="text-xl text-gray-700 mr-4"><i class="fa-solid fa-arrow-left"></i></button><h2 class="text-xl font-bold text-gray-800">Delivery Address</h2></div><form id="address-form" onsubmit="placeOrder(event)"><div class="space-y-4"><input type="text" name="fullName" placeholder="Full Name" class="w-full p-3 border rounded-lg" value="${currentUser && currentUser.address ? currentUser.address.fullName : ''}" required><input type="tel" name="mobile" placeholder="Mobile Number" class="w-full p-3 border rounded-lg" value="${currentUser && currentUser.mobile ? currentUser.mobile : ''}" required><input type="text" name="houseNo" placeholder="House No, Building Name" class="w-full p-3 border rounded-lg" value="${currentUser && currentUser.address ? currentUser.address.houseNo : ''}" required><input type="text" name="street" placeholder="Street, Area" class="w-full p-3 border rounded-lg" value="${currentUser && currentUser.address ? currentUser.address.street : ''}" required><input type="text" name="city" placeholder="City" class="w-full p-3 border rounded-lg" value="${currentUser && currentUser.address ? currentUser.address.city : ''}" required><input type="text" name="pincode" placeholder="Pincode" class="w-full p-3 border rounded-lg" value="${currentUser && currentUser.address ? currentUser.address.pincode : ''}" required></div><div class="mt-6"><h3 class="text-lg font-bold text-gray-800 mb-3">Payment Option</h3><div class="border-2 border-blue-500 bg-blue-50 rounded-lg p-3 flex items-center"><i class="fa-solid fa-wallet text-blue-600 text-xl"></i><span class="font-semibold text-gray-800 ml-3">Cash on Delivery (COD)</span><i class="fa-solid fa-check-circle text-blue-600 ml-auto text-xl"></i></div></div><button type="submit" class="w-full bg-red-500 text-white font-bold py-3 rounded-lg mt-6 hover:bg-red-600">Place Order</button></form>`;
+            pageContainers.checkout.innerHTML = `<div class="flex items-center mb-4"><button onclick="showTab('cart')" class="text-xl text-gray-700 mr-4"><i class="fa-solid fa-arrow-left"></i></button><h2 class="text-xl font-bold text-gray-800">Delivery Address</h2></div><form id="address-form" onsubmit="placeOrder(event)"><div class="space-y-4"><input type="text" name="fullName" placeholder="Full Name" class="w-full p-3 border rounded-lg" value="${(currentUser && currentUser.name) || ''}" required><input type="tel" name="mobile" placeholder="Mobile Number" class="w-full p-3 border rounded-lg" value="${(currentUser && currentUser.mobile) || ''}" required><input type="text" name="houseNo" placeholder="House No, Building Name" class="w-full p-3 border rounded-lg" value="${(selectedAddress && selectedAddress.houseNo) || (currentUser && currentUser.address ? currentUser.address.houseNo : '')}" required><input type="text" name="street" placeholder="Street, Area" class="w-full p-3 border rounded-lg" value="${(selectedAddress && selectedAddress.street) || (currentUser && currentUser.address ? currentUser.address.street : '')}" required><input type="text" name="city" placeholder="City" class="w-full p-3 border rounded-lg" value="${(selectedAddress && selectedAddress.city) || (currentUser && currentUser.address ? currentUser.address.city : '')}" required><input type="text" name="pincode" placeholder="Pincode" class="w-full p-3 border rounded-lg" value="${(selectedAddress && selectedAddress.pincode) || (currentUser && currentUser.address ? currentUser.address.pincode : '')}" required></div><div class="mt-6"><h3 class="text-lg font-bold text-gray-800 mb-3">Payment Option</h3><div class="border-2 border-blue-500 bg-blue-50 rounded-lg p-3 flex items-center"><i class="fa-solid fa-wallet text-blue-600 text-xl"></i><span class="font-semibold text-gray-800 ml-3">Cash on Delivery (COD)</span><i class="fa-solid fa-check-circle text-blue-600 ml-auto text-xl"></i></div></div><button type="submit" class="w-full bg-red-500 text-white font-bold py-3 rounded-lg mt-6 hover:bg-red-600">Place Order</button></form>`;
         }
         
         function renderConfirmationPage() {
@@ -514,8 +599,7 @@
             Object.values(pageContainers).forEach(c => c.classList.remove('active'));
             pageContainers[pageKey].classList.add('active');
             
-            const fullScreenPages = ['checkout', 'confirmation', 'loginMobile', 'loginOtp', 'loginDetails', 'orders', 'invoice', 'offer'];
-            const isFullScreen = fullScreenPages.includes(pageKey);
+            const isFullScreen = ['invoice'].includes(pageKey);
             mainHeader.style.display = isFullScreen ? 'none' : 'block';
             bottomNav.style.display = 'flex'; // Always visible
             
@@ -536,6 +620,11 @@
         }
 
         function showTab(tabKey) {
+            // Clear search when changing tabs
+            const searchInput = document.getElementById('search-input');
+            if (searchInput.value !== '') {
+                searchInput.value = '';
+            }
             showPage(tabKey);
             document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('tab-active'));
             const button = document.querySelector(`button[onclick="showTab('${tabKey}')"]`);
@@ -555,6 +644,27 @@
         function showInvoice(orderId) {
             showPage('invoice');
             renderInvoicePage(orderId);
+        }
+
+        function sortProducts(order) {
+            currentSortOrder = order;
+            renderAllProductsPage();
+        }
+        
+        function sortSearchResults(order) {
+            currentSearchSortOrder = order;
+            const term = document.getElementById('search-input').value;
+            renderSearchPage(term);
+        }
+
+        function handleSearch() {
+            const term = document.getElementById('search-input').value.trim();
+            if (term.length > 0) {
+                showPage('search');
+                renderSearchPage(term);
+            } else {
+                showTab('home');
+            }
         }
 
         function handleCheckout() {
@@ -630,9 +740,107 @@
             showTab('profile');
         }
 
+        // --- Location ---
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Radius of the earth in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c; // Distance in km
+        }
+
+        async function reverseGeocode(lat, lng) {
+            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data && data.address) {
+                    const addr = data.address;
+                    selectedAddress = {
+                        houseNo: addr.house_number || '',
+                        street: `${addr.road || ''}, ${addr.suburb || ''}`.replace(/^, /,''),
+                        city: addr.city || addr.town || addr.village || '',
+                        pincode: addr.postcode || '',
+                        fullAddress: `${addr.road || ''}, ${addr.city || ''}`.replace(/^, /,'')
+                    };
+                    document.getElementById('location-text').innerText = selectedAddress.fullAddress;
+                }
+            } catch (error) {
+                console.error("Error fetching address: ", error);
+                document.getElementById('location-text').innerText = "Could not fetch address.";
+            }
+        }
+
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(showPosition, showError);
+            } else { 
+                document.getElementById('location-text').innerText = "Geolocation not supported.";
+            }
+        }
+
+        function showPosition(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            
+            const distance = getDistance(lat, lng, BASE_LOCATION[0], BASE_LOCATION[1]);
+            
+            if (distance <= DELIVERY_RADIUS_KM) {
+                reverseGeocode(lat, lng);
+            } else {
+                document.getElementById('location-text').innerText = "Sorry, delivery is not available at this location.";
+            }
+            
+            if (!map) { // Initialize map only once
+                map = L.map('map').setView([lat, lng], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(map);
+
+                marker = L.marker([lat, lng]).addTo(map);
+                L.circle(BASE_LOCATION, { radius: DELIVERY_RADIUS_KM * 1000 }).addTo(map);
+
+                map.on('click', function(e) {
+                    const clickedDistance = getDistance(e.latlng.lat, e.latlng.lng, BASE_LOCATION[0], BASE_LOCATION[1]);
+                    if (clickedDistance <= DELIVERY_RADIUS_KM) {
+                        marker.setLatLng(e.latlng);
+                        reverseGeocode(e.latlng.lat, e.latlng.lng);
+                        closeMapModal();
+                        document.getElementById('map-message').innerText = '';
+                    } else {
+                        document.getElementById('map-message').innerText = 'This location is outside our delivery area.';
+                    }
+                });
+            } else {
+                map.setView([lat, lng], 13);
+                marker.setLatLng([lat, lng]);
+            }
+        }
+
+        function showError(error) {
+            document.getElementById('location-text').innerText = "Location access denied.";
+            console.log("Geolocation error: " + error.message);
+        }
+        
+        function openMapModal() {
+            mapModal.style.display = 'block';
+            setTimeout(() => {
+                if(map) map.invalidateSize();
+            }, 10);
+        }
+
+        function closeMapModal() {
+            mapModal.style.display = 'none';
+        }
+
+
         // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
             showTab('home');
+            getLocation();
         });
     </script>
 
